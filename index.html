@@ -66,15 +66,7 @@
 <div id="root"></div>
 
 <script>
-  window.__FB_CONFIG__ = {
-    apiKey: "AIzaSyAqTm9Gh9-N5dSfy-jmjTD6PPRyeAt1mpE",
-    authDomain: "mansoor-lootah-login-ff4ad.firebaseapp.com",
-    projectId: "mansoor-lootah-login-ff4ad",
-    storageBucket: "mansoor-lootah-login-ff4ad.appspot.com", // صحيح للاستخدام مع SDK
-    messagingSenderId: "229946254511",
-    appId: "1:229946254511:web:dc9545b6e5957b4c0f205a",
-    measurementId: "G-TZK1NP258K"
-  };
+  window.__FB_CONFIG__={"apiKey":"AIzaSyBXvSOmC3FJyXtT2iiEEtrzBC4rbzVtnis","authDomain":"mansoor-lootah-planner.firebaseapp.com","projectId":"mansoor-lootah-planner","storageBucket":"mansoor-lootah-planner.firebasestorage.app","messagingSenderId":"242079213117","appId":"1:242079213117:web:428383e9061646df3bac54"};
 </script>
 
 <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
@@ -795,109 +787,5 @@ useEffect(() => {
 
 ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
 </script>
-
-<script>
-// ===== Firestore Sync (added) =====
-(function(){
-  if (!window.firebase || !firebase.app) return;
-  const app = firebase.app();
-  const auth = firebase.auth();
-  const db = firebase.firestore();
-
-  function userDocRef(uid){ return db.collection('users').doc(uid); }
-  function dayDocRef(uid, day){ return userDocRef(uid).collection('days').doc(day); }
-
-  window.FB_SYNC = {
-    async saveDay(uid, day, payload){
-      try{
-        await dayDocRef(uid, day).set(payload || {}, { merge:true });
-      }catch(e){ console.error('saveDay cloud', e); }
-    },
-    async loadAll(uid){
-      const out = {};
-      try{
-        const snap = await userDocRef(uid).collection('days').get();
-        snap.forEach(d => { out[d.id] = d.data() || {}; });
-      }catch(e){ console.error('loadAll cloud', e); }
-      return out;
-    }
-  };
-})();
-</script>
-
-<script>
-(function(){
-  if (!window.firebase || !firebase.auth) return;
-  firebase.auth().onAuthStateChanged(async function(u){
-    window.__USER = u || null;
-    if(!u) return;
-    try {
-      if (window.FB_SYNC){
-        const cloud = await FB_SYNC.loadAll(u.uid);
-        if (cloud && Object.keys(cloud).length){
-          for (const [day, obj] of Object.entries(cloud)){
-            try{ localStorage.setItem('cal-'+day, JSON.stringify(obj)); }catch(e){}
-          }
-          // naive UI refresh: reload
-          try{ location.reload(); }catch(_){}
-        }
-      }
-    } catch(e){ console.error(e); }
-  });
-})();
-</script>
-
-
-<script>
-// ===== Firestore Realtime Sync (onSnapshot) =====
-(function(){
-  if (!window.firebase || !firebase.firestore || !firebase.auth) return;
-  const db = firebase.firestore();
-  const auth = firebase.auth();
-
-  // light debounce
-  let reloadTimer = null;
-  function softRefresh(){
-    if (reloadTimer) clearTimeout(reloadTimer);
-    reloadTimer = setTimeout(function(){
-      try {
-        // try to trigger any UI re-render without full reload
-        window.dispatchEvent(new StorageEvent('storage',{key:'__refresh__',newValue:Date.now().toString()}));
-      } catch(_){
-        try{ location.reload(); }catch(__){}
-      }
-    }, 250);
-  }
-
-  function attachRealtime(uid){
-    if (!uid) return;
-    if (window.__UNSUB_DAYS) { try{ window.__UNSUB_DAYS(); }catch(e){} }
-    window.__UNSUB_DAYS = db.collection('users').doc(uid).collection('days')
-      .onSnapshot(function(snap){
-        // apply doc changes to local cache
-        snap.docChanges().forEach(function(change){
-          const day = change.doc.id;
-          const data = change.doc.data() || {};
-          const key = 'cal-' + day;
-          if (change.type === 'removed'){
-            try { localStorage.removeItem(key); } catch(e){}
-          } else {
-            try { localStorage.setItem(key, JSON.stringify(data)); } catch(e){}
-          }
-        });
-        softRefresh();
-      }, function(err){
-        console.error('Realtime listener error:', err);
-      });
-  }
-
-  auth.onAuthStateChanged(function(u){
-    window.__USER = u || null;
-    if (u) attachRealtime(u.uid);
-    else if (window.__UNSUB_DAYS) { try{ window.__UNSUB_DAYS(); }catch(e){} }
-  });
-})();
-</script>
-
 </body>
 </html>
